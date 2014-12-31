@@ -1,0 +1,15 @@
+{
+  "name": "gobble-node-server",
+  "license": "MIT",
+  "version": "0.0.1",
+  "description": "A gobble plugin that takes your node app and runs it and restarts it on change",
+  "homepage": "https://github.com/evs-chris/gobble-node-server",
+  "author": { "name": "Chris Reeves" },
+  "main": "index.js",
+  "repository": { "type": "git", "url": "https://github.com/evs-chris/gobble-node-server.git" },
+  "files": [ "package.json", "index.js", "LICENSE.md" ],
+  "keywords": [ "gobble-plugin", "gobble", "server" ],
+  "dependencies": {
+    "sander": "^0"
+  }
+}
