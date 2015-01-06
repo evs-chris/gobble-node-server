@@ -4,9 +4,19 @@ var spawn = require('child_process').spawn;
 
 module.exports = nodeApp;
 
+function noop() {}
+
 function nodeApp(indir, outdir, options, done) {
   var dir = path.resolve(outdir, '../../../.node-app');
   var pidfile = path.resolve(dir, 'NODE-APP.pid');
+  var log = this.log || noop;
+
+  options.pidfile = pidfile;
+  options.dir = dir;
+
+  if (typeof options.init === 'function') {
+    options.init.call(this, options);
+  }
 
   if (!nodeApp.inited) {
     nodeApp.inited = true;
@@ -18,7 +28,7 @@ function nodeApp(indir, outdir, options, done) {
       sander.unlinkSync(pidfile);
     });
     if (sander.existsSync(pidfile)) {
-      console.log('It looks like gobble restarted, so I\'m going to try killing the old node app process.');
+      log('\nIt looks like gobble restarted, so I\'m going to try killing the old node app process.');
       var pid = sander.readFileSync(pidfile).toString();
       try {
         process.kill(pid, 'SIGINT');
@@ -38,6 +48,7 @@ function nodeApp(indir, outdir, options, done) {
     sander.copydirSync(indir).to(dir);
     var exec = options.exec || process.execPath;
     var args = (options.flags || []).concat(path.join('.node-app', options.entry));
+    if (Array.isArray(options.appflags)) args = args.concat(options.appflags);
     var opts = {};
 
     var child = nodeApp.child = spawn(exec, args, opts);
