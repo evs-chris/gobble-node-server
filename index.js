@@ -2,28 +2,26 @@ var sander = require('sander');
 var path = require('path');
 var spawn = require('child_process').spawn;
 
-module.exports = nodeApp;
+module.exports = nodeServer;
 
 function noop() {}
 
-function nodeApp(indir, outdir, options, done) {
-  var dir = path.resolve(outdir, '../../../.node-app');
-  var pidfile = path.resolve(dir, 'NODE-APP.pid');
+function nodeServer(indir, outdir, options, done) {
+  var pidfile = path.resolve(process.cwd(), options.pidfile || 'NODE-APP.pid');
   var log = this.log || noop;
 
   options.pidfile = pidfile;
-  options.dir = dir;
 
   if (typeof options.init === 'function') {
     options.init.call(this, options);
   }
 
-  if (!nodeApp.inited) {
-    nodeApp.inited = true;
+  if (!nodeServer.inited) {
+    nodeServer.inited = true;
     process.on('exit', function() {
-      if (nodeApp.child) {
-        console.log('killing child ' + nodeApp.child.pid);
-        nodeApp.child.kill('SIGINT');
+      if (nodeServer.child) {
+        console.log('killing child ' + nodeServer.child.pid);
+        nodeServer.child.kill('SIGINT');
       }
       sander.unlinkSync(pidfile);
     });
@@ -37,33 +35,40 @@ function nodeApp(indir, outdir, options, done) {
   }
 
   if (sander.existsSync(pidfile)) {
-    if (nodeApp.child) {
-      console.log('...killing child ' + nodeApp.child.pid);
-      nodeApp.child.on('exit', step1);
-      nodeApp.child.kill('SIGINT');
+    if (nodeServer.child) {
+      console.log('...killing child ' + nodeServer.child.pid);
+      nodeServer.child.on('exit', step1);
+      nodeServer.child.kill('SIGINT');
     } else step1();
   } else step1();
 
   function step1() {
-    sander.copydirSync(indir).to(dir);
     var exec = options.exec || process.execPath;
-    var args = (options.flags || []).concat(path.join('.node-app', options.entry));
+    var args = (options.flags || []).concat(path.join(indir, options.entry));
     if (Array.isArray(options.appflags)) args = args.concat(options.appflags);
-    var opts = {};
+    var opts = {
+      cwd: indir
+    };
 
-    var child = nodeApp.child = spawn(exec, args, opts);
+    var child = nodeServer.child = spawn(exec, args, opts);
     var started = Date.now();
     var timeout = options.timeout || 1000;
+    var failed = false;
+
     child.on('exit', function() {
-      nodeApp.child = undefined;
+      nodeServer.child = undefined;
       if (Date.now() - started < timeout) {
         console.warn('Your node app exited in less than ' + timeout + 'ms. Something may have gone wrong.');
+        failed = true;
       }
     });
-    child.stdout.on('data', nodeApp.log);
-    child.stderr.on('data', nodeApp.log);
+    child.stdout.on('data', nodeServer.log);
+    child.stderr.on('data', nodeServer.log);
     sander.writeFileSync(pidfile, child.pid);
-    setTimeout(done, timeout);
+    setTimeout(function() {
+      if (failed) done(new Error('Your app exited before the timeout expired.'));
+      else done();
+    }, timeout);
   }
 }
-nodeApp.log = function log(data) { console.log(data.toString()); };
+nodeServer.log = function log(data) { console.log(data.toString()); };
